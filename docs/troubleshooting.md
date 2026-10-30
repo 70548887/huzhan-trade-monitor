@@ -1,0 +1,93 @@
+# 常见问题
+
+[返回项目首页](../README.md) · [部署指南](deployment.md)
+
+先确认查看的是 `huzhan-trade-monitor` 项目的最新日志。日志可能同时包含历史错误和本次启动结果，应从末尾判断当前问题；同机其他项目（例如 `server_monitor`）的日志不能代表本项目状态。
+
+<a id="python"></a>
+
+## Python 路径不存在
+
+典型提示：`nohup: failed to run command '.../.venv/bin/python': No such file or directory`。
+
+命令中的解释器路径不存在或链接失效。使用宝塔管理环境时，在环境管理中查看实际 Python 路径；不要直接复制手动虚拟环境示例。依赖已安装且宝塔可以找到 `uvicorn` 时，可直接使用部署指南中的 `uvicorn ...` 命令。
+
+如果提示 `uvicorn` 找不到，或缺少 `fastapi`、`bs4` 等模块，应在**该项目使用的 Python 环境**安装 `requirements.txt`，不要在另一份系统 Python 中安装。
+
+<a id="module"></a>
+
+## 找不到 huzhan_monitor 模块
+
+典型提示：`ModuleNotFoundError: No module named 'huzhan_monitor'`。
+
+检查项目根目录下是否直接存在 `huzhan_monitor/web.py` 和 `requirements.txt`。解压版本包可能多一层目录；宝塔的“项目路径”和命令中的 `--app-dir` 都要指向直接包含它们的目录。
+
+```bash
+uvicorn huzhan_monitor.web:app --app-dir /www/wwwroot/huzhan-trade-monitor --host 127.0.0.1 --port 38761 --workers 1
+```
+
+示例路径必须换成服务器实际路径。应用入口是 `huzhan_monitor.web:app`，不是其他项目使用的 `app.main:app`。
+
+<a id="port"></a>
+
+## 端口已被占用
+
+典型提示：`address already in use`，Linux 常见错误编号为 `98`。
+
+在部署服务器终端检查实际端口。下面以宝塔原生示例的 `38761` 为例：
+
+```bash
+ss -ltnp 'sport = :38761'
+curl --silent --show-error --max-time 5 http://127.0.0.1:38761/health
+```
+
+如果返回 `huzhan-monitor-ok`，该端口已有本项目的网页服务；确认它由哪个项目或进程管理，避免重复启动。否则先识别占用程序，或为本项目选一个空闲端口，并同步修改反向代理目标。不要按端口盲目结束未知进程。
+
+Docker 默认宿主机端口和 Windows 端口为 `8878`。Docker 修改方法见[端口配置](deployment.md#docker)；不要将宿主机端口与容器内端口混淆。
+
+<a id="permissions"></a>
+
+## 没有目录权限 / 数据库只读
+
+典型提示包括 `PermissionError`、`unable to open database file`、`attempt to write a readonly database`。
+
+确认网页与采集任务使用相同的运行用户，且该用户对 `data`、`logs` 及已有数据库文件有读写权限。宝塔网页使用 `www` 时，采集任务也应以 `www` 执行；不能依赖 root 采集生成的文件默认对 `www` 可写。
+
+目录设置与权限命令见[宝塔部署步骤](deployment.md#baota)。
+
+<a id="collection"></a>
+
+## 网页能打开，但没有采集数据
+
+原生宝塔部署只启动 Uvicorn，不会自动启动采集任务。检查以下项目：
+
+- 是否建立了每 10 分钟执行一次的 Shell 采集任务。
+- 采集任务是否使用网页对应环境的 Python，并能导入 `huzhan_monitor`。
+- 网页和采集器是否使用相同的数据目录。
+- 采集日志中的最近结果是否成功。
+
+Docker 应同时运行 `web` 和 `collector`；Windows 需要完成 `安装定时任务.bat`。首次成功采集会建立存量基线，新增成功金额为零并不表示采集没有工作。
+
+<a id="http"></a>
+
+## 403 或采集时间缺口
+
+`403 Forbidden` 表示互站拒绝了当次访问；仅凭状态码不能确定具体原因。程序记录失败，之后继续按调度采集，不会把失败页面计为零交易。
+
+超过 15 分钟的成功采集间隔会显示缺口。随后采集成功，历史警告仍会保留在对应日期。首页没有已验证的历史补采能力，缺口中的条目可能无法补齐。
+
+<a id="totals"></a>
+
+## 交易中的金额与新增金额不一致
+
+“当日观察到的交易中金额”包含当天曾出现的存量与新条目；“新增进行中条目金额”排除了首次启动基线；“最后一次采集的交易中金额”只来自当天最后一次成功采集。因此三者可以不同。
+
+同一条目可能先显示正在交易、后来成功，不能把交易中金额与成功金额直接相加。完整定义见[统计口径](../README.md#统计口径)。
+
+## 指数缺少日期边界快照
+
+如果监控在当天中途启动，或者午夜附近出现采集缺口，就没有足够的日期边界快照。页面仍展示实际观测区间的指数变化，并标明起止时间；这不是整天的成交金额。
+
+## 页面内容没有更新
+
+先点击页面的“刷新数据”；代码升级后如果仍显示旧布局，再刷新浏览器页面。页面查询和定时采集是独立的，查看最近成功采集时间可以区分页面尚未刷新与采集任务没有运行。
