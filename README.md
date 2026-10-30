@@ -2,6 +2,41 @@
 
 每 10 分钟采集互站首页公开的最新交易，通过网页查看每日观察金额、商品、平台指数和采集状态。可在 Windows 本机运行，也可使用 Docker 部署到 Linux 服务器。
 
+## 版本下载
+
+请从 [GitHub Releases](https://github.com/70548887/huzhan-trade-monitor/releases) 下载对应版本的源码包；版本变更详见 [CHANGELOG.md](CHANGELOG.md)。源码包不包含运行数据、日志或 Python 虚拟环境。
+
+## Linux 宝塔 / Python 项目部署
+
+以下以 `/www/wwwroot/huzhan-trade-monitor` 为项目目录、`www` 为运行用户举例；请根据服务器实际情况修改。Python 建议使用 3.12。
+
+1. 将发布版源码解压至项目目录，进入目录后创建虚拟环境并安装依赖：
+
+   ```bash
+   cd /www/wwwroot/huzhan-trade-monitor
+   python3.12 -m venv .venv
+   .venv/bin/python -m pip install -r requirements.txt
+   mkdir -p data logs
+   chown -R www:www data logs
+   ```
+
+   如果 Python 3.12 不在命令路径中，请将 `python3.12` 替换为宝塔 Python 环境中的实际解释器路径。
+
+2. 在宝塔“Python 项目”添加项目，根目录选择项目目录，运行用户设为 `www`，使用自定义启动命令：
+
+   ```bash
+   /www/wwwroot/huzhan-trade-monitor/.venv/bin/python -m uvicorn huzhan_monitor.web:app --host 127.0.0.1 --port 8878
+   ```
+
+3. 在宝塔“计划任务”添加 Shell 任务，设置每 10 分钟执行一次，并使用与网页服务相同的运行用户。例如计划任务由 root 启动、网页使用 `www` 时：
+
+   ```bash
+   cd /www/wwwroot/huzhan-trade-monitor
+   runuser -u www -- .venv/bin/python -m huzhan_monitor.collector
+   ```
+
+网页与采集任务需要对同一份 `data` 和 `logs` 目录拥有读写权限。网页服务不会自动运行采集器，计划任务必须单独配置。然后在宝塔配置反向代理，目标为 `http://127.0.0.1:8878`；开放公网前应配置访问验证或限制，并启用 HTTPS。
+
 ## Linux 宝塔 / Docker 部署
 
 服务器需要安装 Git、Docker 和 Docker Compose。可以在宝塔终端中执行：
