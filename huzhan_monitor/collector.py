@@ -2,23 +2,20 @@
 from __future__ import annotations
 
 import argparse
-import errno
 import hashlib
 import json
 import logging
-import os
 import re
 import time
 import unicodedata
-from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 from bs4 import BeautifulSoup
 
 from . import db, settings
+from .locking import file_lock
 
 LOG = logging.getLogger("huzhan")
 HEADERS = {
@@ -143,37 +140,9 @@ def request_with_retry(client: httpx.Client, method: str, url: str, **kwargs) ->
     raise FeedError("网络请求失败")
 
 
-@contextmanager
 def collection_lock():
     """Use an operating-system lock to prevent concurrent collectors."""
-    settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    lock_path = settings.DATA_DIR / "collector.lock"
-    with lock_path.open("a+b") as lock:
-        lock.seek(0, 2)
-        if lock.tell() == 0:
-            lock.write(b"0")
-            lock.flush()
-        lock.seek(0)
-        try:
-            if os.name == "nt":
-                import msvcrt
-                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as exc:
-            if exc.errno in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
-                yield False
-                return
-            raise
-        try:
-            yield True
-        finally:
-            if os.name == "nt":
-                lock.seek(0)
-                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    return file_lock(settings.DATA_DIR / "collector.lock")
 
 
 def setup_logging() -> None:

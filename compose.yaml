@@ -3,10 +3,12 @@ services:
     image: huzhan-trade-monitor:local
     build: .
     restart: unless-stopped
+    stop_grace_period: 45s
     environment:
       HUZHAN_ADMIN_USERNAME: ${HUZHAN_ADMIN_USERNAME:-admin}
       HUZHAN_ADMIN_PASSWORD: ${HUZHAN_ADMIN_PASSWORD:-}
       HUZHAN_COOKIE_SECURE: ${HUZHAN_COOKIE_SECURE:-0}
+      HUZHAN_AUTO_COLLECT: ${HUZHAN_AUTO_COLLECT:-1}
     ports:
       - "127.0.0.1:8878:8878"
     volumes:
@@ -18,18 +20,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-
-  collector:
-    image: huzhan-trade-monitor:local
-    build: .
-    command: ["python", "-m", "huzhan_monitor.scheduler"]
-    restart: unless-stopped
-    depends_on:
-      web:
-        condition: service_healthy
-    volumes:
-      - monitor_data:/app/data
-      - monitor_logs:/app/logs
 
 volumes:
   monitor_data:

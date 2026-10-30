@@ -5,6 +5,7 @@ import csv
 import io
 import hmac
 import secrets
+import logging
 from datetime import date
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -28,9 +29,22 @@ SESSION_SECONDS = 12 * 60 * 60
 
 @app.on_event("startup")
 def init_database() -> None:
+    app.state.collector_scheduler = None
     db.initialize()
     auth.initialize()
     auth.bootstrap_from_environment()
+    if settings.AUTO_COLLECT:
+        from .scheduler import Scheduler
+        app.state.collector_scheduler = Scheduler().start()
+
+
+@app.on_event("shutdown")
+def stop_collection() -> None:
+    scheduler = getattr(app.state, "collector_scheduler", None)
+    if scheduler is not None:
+        if not scheduler.stop(timeout=35):
+            logging.getLogger("huzhan").warning("网页正在退出，当前采集尚未结束；下次启动将检查中断记录。")
+        app.state.collector_scheduler = None
 
 
 @app.middleware("http")
@@ -256,4 +270,4 @@ def export(day: str | None = None, status: str = "all", q: str = Query("", max_l
 
 @app.get("/health", response_class=PlainTextResponse)
 def health():
-    return "huzhan-monitor-ok"
+    return PlainTextResponse("huzhan-monitor-ok", headers={"X-Huzhan-Auto-Collect": "1" if settings.AUTO_COLLECT else "0"})

@@ -2,7 +2,9 @@
 
 [返回项目首页](../README.md) · [常见问题](troubleshooting.md)
 
-本项目由网页服务和采集服务组成。宝塔原生部署需要分别启动它们；Docker Compose 会管理两个服务；Windows 安装脚本会创建相应的计划任务。
+从 v0.3.0 起，网页项目内置后台采集。正常安装依赖并启动项目后，就会立即采集一次，再每 10 分钟自动执行。宝塔不再需要单独配置采集计划，Docker 也只运行一个网页容器。
+
+**旧版本升级**：停用原有宝塔采集计划任务；Windows 安装脚本会禁用旧的采集任务。Docker 更新时使用 `docker compose up -d --build --remove-orphans`，移除原来的独立 collector 容器。历史数据保留。
 
 本指南的宝塔原生示例使用 `38761` 端口。现有 Docker 和 Windows 配置默认使用 `8878`。端口以实际启动配置为准，反向代理必须指向相同端口。
 
@@ -92,22 +94,15 @@ http://127.0.0.1:38761
 
 `127.0.0.1` 只供服务器本机访问；其他电脑或手机通过配置好的站点域名访问。首次访问会显示登录页，请完成[管理员初始化和 HTTPS 配置](#account)。
 
-### 4. 配置每 10 分钟采集
+### 4. 查看自动采集状态
 
-网页运行不代表采集已经开始。在宝塔“计划任务”中添加 Shell 任务，执行周期设置为每 10 分钟。
+启动网页后，后台立即开始首次采集，此后每 10 分钟执行。登录并打开“运行日志”，查看最近一次记录即可。即使尚未登录或尚未配置管理员，后台采集也会按配置运行，数据页面仍受登录保护。
 
-先在宝塔环境管理中复制**与网页相同环境**的 Python 解释器完整路径，替换下面 `HZ_PYTHON` 的值。此示例适用于计划任务以 root 执行、项目以 `www` 运行的情况：
+不需要安装额外调度插件或添加宝塔计划任务。网页服务停止后，自动采集也随之停止；重启网页会重新启动调度。同一数据目录只允许一个内置调度器工作，多进程启动不会各自重复轮询。
 
-```bash
-# 必须替换为宝塔项目环境中实际存在的 Python 路径。
-HZ_PYTHON='/替换为实际环境路径/bin/python'
-cd /www/wwwroot/huzhan-trade-monitor || exit 1
-runuser -u www -- "$HZ_PYTHON" -m huzhan_monitor.collector
-```
+如果升级前已经建立“互站交易采集”计划任务，请将其停用，避免旧任务额外触发采集。
 
-如果计划任务已经以 `www` 执行，最后一行直接使用 `"$HZ_PYTHON" -m huzhan_monitor.collector`。任务与网页必须共用相同的数据目录和读写权限。
-
-保存后手动执行一次，查看任务日志中的“采集成功”或具体失败原因，再刷新网页查看最近采集时间。已有独立采集进程时，不要再重复配置另一种调度方式。
+仅在需要保留外部调度时，设置 `HUZHAN_AUTO_COLLECT=0` 并重启网页，再由外部任务调用 `python -m huzhan_monitor.collector`。解释器、运行用户和数据目录应与网页一致。依赖只在首次部署或升级时安装，不应把 pip 安装命令放入每 10 分钟执行的任务。
 
 参考：[宝塔 Python 项目管理](https://docs.bt.cn/ai-ops/mcp/tools-reference/)、[计划任务](https://docs.bt.cn/user-guide/crontab/task/)、[反向代理](https://docs.bt.cn/user-guide/site/php/site-config/reverse-proxy)。
 
@@ -130,12 +125,7 @@ docker compose ps
 
 `git clone` 获取 `main` 分支最新代码；如需固定版本，可下载对应 Release 的源码包，在解压后的项目根目录运行 Compose 命令。保持部署目录和 Compose 项目名不变，避免更新时创建新的数据卷。
 
-[`compose.yaml`](../compose.yaml) 定义了两个服务：
-
-- `web`：网页服务，通过服务器本地的 `127.0.0.1:8878` 提供查询。
-- `collector`：首次启动立即采集，之后每 10 分钟执行；不需要另建宝塔采集计划任务。
-
-两个服务共用 `monitor_data` 和 `monitor_logs` 命名卷，容器重建后数据仍保留。此方式需要在目标服务器构建镜像；本仓库未提供预构建镜像。
+[`compose.yaml`](../compose.yaml) 只启动 `web` 服务，通过服务器本地的 `127.0.0.1:8878` 提供查询，并在后台自动采集。`monitor_data` 和 `monitor_logs` 命名卷负责持久化，容器重建后数据仍保留。此方式需要在目标服务器构建镜像；本仓库未提供预构建镜像。
 
 ### 端口与访问
 
@@ -151,7 +141,6 @@ ports:
 ### 日常管理
 
 ```bash
-docker compose logs --tail=50 collector
 docker compose logs --tail=50 web
 docker compose restart
 docker compose down
@@ -164,15 +153,15 @@ docker compose down
 ## Windows 本机
 
 1. 安装 Python 3.12，确保终端可以执行 `python`。
-2. 将源码解压到固定目录，双击 `安装定时任务.bat`。脚本会创建 `.venv`、安装依赖、注册任务并启动网页服务。
+2. 将源码解压到固定目录，双击 `安装自启动.bat`（旧的 `安装定时任务.bat` 仍兼容）。脚本会创建 `.venv`、安装依赖、注册登录自启动并启动网页服务。
 3. 在项目目录执行 `.\.venv\Scripts\python.exe -m huzhan_monitor.admin --username admin`，按提示创建账号。
 4. 双击 `启动监控.bat`，或打开 `http://127.0.0.1:8878/`，使用刚创建的账号登录。
 
 这里的 `.venv` 由 Windows 安装脚本创建，与宝塔管理的环境是两种部署方式。
 
-- `HuzhanMonitorCollector`：每 10 分钟执行一次采集。
-- `HuzhanMonitorLogon`：当前用户登录后启动网页服务并补采一次。
-- `停用定时任务.bat`：停用上述任务，保留历史数据；它不会自动关闭已经启动的网页进程。
+- `HuzhanMonitorLogon`：当前用户登录后启动网页服务，网页内部自动采集。
+- 旧任务 `HuzhanMonitorCollector`：安装脚本会将其禁用，避免重复调度。
+- `停用定时任务.bat`：停用登录自启动和旧任务，保留历史数据；它不会关闭已经启动的网页进程，运行中的网页服务仍会采集。
 
 电脑需要保持开机、联网并登录 Windows。关机、休眠或未登录期间无法持续采集。需要手动采集时，在项目目录执行：
 
@@ -181,6 +170,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\collect.ps1
 ```
 
 Windows 脚本默认使用 `8878`，没有提供端口环境变量。发生端口冲突时，先按[排错指南](troubleshooting.md#port)识别占用程序。
+
+Windows 升级时，安装脚本会检查当前运行的服务是否已启用内置采集，确认后才停用旧任务。如果旧网页进程仍在运行，请先重启新版网页，再运行一次安装脚本完成切换。
 
 <a id="data"></a>
 
@@ -196,6 +187,8 @@ Windows 脚本默认使用 `8878`，没有提供端口环境变量。发生端�
 
 原生部署可使用 `HUZHAN_MONITOR_DATA_DIR` 和 `HUZHAN_MONITOR_LOG_DIR` 环境变量更改目录。网页服务和采集任务必须设置为同一路径。Docker 默认使用挂载命名卷的 `/app/data` 和 `/app/logs`。
 
+`HUZHAN_AUTO_COLLECT` 默认为 `1`，表示启动网页时自动采集；设为 `0` 可切换为外部调度。默认采集间隔为 10 分钟。
+
 数据库和备份也包含管理员密码哈希及会话记录，需要妥善保管。账号密码不写入采集日志；不要公开上传数据库、备份或本地生成的凭据文件。
 
 ### 备份与迁移
@@ -208,8 +201,8 @@ GitHub 和发布包不包含运行数据库。新机器首次部署会建立新�
 
 更新前备份数据，并保留现有的运行环境、目录权限、启动命令和采集配置。使用 Git 安装且没有本地修改时，可以执行 `git pull --ff-only`；本地有修改时，先检查并保留，不要强制覆盖。
 
-- **宝塔**：在项目使用的 Python 环境中更新 `requirements.txt` 依赖，再重启网页服务。采集计划任务继续使用相同解释器和数据目录。
-- **Docker**：保持同一 Compose 项目名，在原部署目录执行 `docker compose up -d --build`；不要删除数据卷。
+- **宝塔**：在项目使用的 Python 环境中更新 `requirements.txt` 依赖，停用旧采集计划，再重启网页服务。内置采集使用同一解释器、用户和数据目录。
+- **Docker**：保持同一 Compose 项目名，在原部署目录执行 `docker compose up -d --build --remove-orphans`；该选项会移除不再定义的旧 collector 容器，数据卷保留。
 - **Windows**：更新源码后，在现有 `.venv` 中安装 `requirements.txt` 依赖，重启网页进程；修改部署目录时需要重新注册计划任务。
 
 已有 Release 源码包及标签不会随 `main` 文档更新而变化。[版本记录](../CHANGELOG.md)记录每次正式发布内容。

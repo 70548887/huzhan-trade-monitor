@@ -13,6 +13,7 @@ PORT = 8878
 RAW_RETENTION_DAYS = 90
 BACKUP_RETENTION_COUNT = 30
 COOKIE_SECURE = os.environ.get("HUZHAN_COOKIE_SECURE", "0").strip().lower() in ("1", "true", "yes")
+AUTO_COLLECT = os.environ.get("HUZHAN_AUTO_COLLECT", "1").strip().lower() not in ("0", "false", "no", "off")
 
 
 def now_beijing() -> datetime:

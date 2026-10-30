@@ -28,6 +28,8 @@ class MonitorTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.old_data, self.old_db = settings.DATA_DIR, settings.DB_PATH
+        self.old_auto = settings.AUTO_COLLECT
+        settings.AUTO_COLLECT = False
         settings.DATA_DIR = Path(self.temp.name)
         settings.DB_PATH = settings.DATA_DIR / "monitor.sqlite3"
         db.initialize()
@@ -35,6 +37,7 @@ class MonitorTest(unittest.TestCase):
 
     def tearDown(self):
         settings.DATA_DIR, settings.DB_PATH = self.old_data, self.old_db
+        settings.AUTO_COLLECT = self.old_auto
         self.temp.cleanup()
 
     def collect(self, when, rows, cents=100000, count=10):

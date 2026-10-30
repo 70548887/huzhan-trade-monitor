@@ -310,7 +310,9 @@ def run_log_report(day: date, status: str = "all", page: int = 1, page_size: int
     index = platform_index(day)
     notices = []
     if first_run is None:
-        notices.append({"level": "info", "message": "尚未执行采集。请先配置采集计划任务并运行一次，网页服务本身不会自动采集。"})
+        message = ("尚未执行采集。内置自动采集已启用，正在等待首次执行；若持续无记录，请检查服务日志和目录权限。"
+                   if settings.AUTO_COLLECT else "尚未执行采集。内置自动采集已关闭，请配置外部采集任务。")
+        notices.append({"level": "info", "message": message})
     elif not daily["available"]:
         notices.append({"level": "warning" if counts_summary["total"] else "info",
                         "message": "所选日期没有成功采集记录，无法判断当天的交易金额。"})
@@ -326,6 +328,7 @@ def run_log_report(day: date, status: str = "all", page: int = 1, page_size: int
         notices.append({"level": "error", "message": "当前备份或试运行评估异常：" + meta["maintenance_error"]})
     return {
         "date": day.isoformat(), "entries": entries, "page": page, "page_size": page_size,
+        "auto_collect": settings.AUTO_COLLECT,
         "total": total, "pages": pages, "summary": counts_summary, "notices": notices,
         "last_success_at": daily["last_success_at"], "baseline_at": meta.get("baseline_completed"),
         "trial": db.evaluate_trial(), "trial_started_at": meta.get("trial_started"),

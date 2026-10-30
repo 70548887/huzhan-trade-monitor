@@ -19,6 +19,8 @@ class AuthenticationAndLogsTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.original = settings.DATA_DIR, settings.DB_PATH, settings.COOKIE_SECURE
+        self.old_auto = settings.AUTO_COLLECT
+        settings.AUTO_COLLECT = False
         settings.DATA_DIR = Path(self.temp.name)
         settings.DB_PATH = settings.DATA_DIR / "monitor.sqlite3"
         settings.COOKIE_SECURE = False
@@ -32,6 +34,7 @@ class AuthenticationAndLogsTest(unittest.TestCase):
         self.client_context.__exit__(None, None, None)
         self.environment.stop()
         settings.DATA_DIR, settings.DB_PATH, settings.COOKIE_SECURE = self.original
+        settings.AUTO_COLLECT = self.old_auto
         self.temp.cleanup()
 
     def configure(self):
@@ -144,6 +147,31 @@ class AuthenticationAndLogsTest(unittest.TestCase):
         self.assertEqual(result["entries"][0]["error"], "HTTPStatusError: 403 Forbidden")
         empty = self.client.get("/api/logs?day=2026-01-01&status=success").json()
         self.assertEqual(empty["total"], 0)
+
+
+class EmbeddedCollectionLifecycleTest(unittest.TestCase):
+    def test_web_lifecycle_starts_and_stops_only_when_enabled(self):
+        for enabled in (True, False):
+            with self.subTest(auto_collect=enabled), tempfile.TemporaryDirectory() as folder:
+                data = Path(folder)
+                with patch.multiple(settings, DATA_DIR=data, DB_PATH=data / "monitor.sqlite3", AUTO_COLLECT=enabled), \
+                     patch.dict(os.environ, {"HUZHAN_ADMIN_PASSWORD": ""}), \
+                     patch("huzhan_monitor.scheduler.Scheduler") as factory:
+                    scheduler = factory.return_value
+                    scheduler.start.return_value = scheduler
+                    scheduler.stop.return_value = True
+                    with TestClient(app) as client:
+                        response = client.get("/health")
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.headers["x-huzhan-auto-collect"], "1" if enabled else "0")
+                        if enabled:
+                            factory.assert_called_once_with()
+                            scheduler.start.assert_called_once_with()
+                            scheduler.stop.assert_not_called()
+                        else:
+                            factory.assert_not_called()
+                    if enabled:
+                        scheduler.stop.assert_called_once_with(timeout=35)
 
 
 if __name__ == "__main__":
