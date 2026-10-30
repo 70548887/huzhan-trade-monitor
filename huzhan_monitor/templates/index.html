@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>互站交易监控</title>
+  <link rel="stylesheet" href="/static/style.css?v=20261030-2">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow"><span class="live-dot"></span> 本地监控</p>
+        <h1>互站交易监控</h1>
+        <p class="subheading">查看公开交易动态与每日观察数据</p>
+      </div>
+      <div class="toolbar">
+        <label for="day">查看日期</label>
+        <input id="day" type="date">
+        <button id="today" class="secondary" type="button">今天</button>
+        <button id="refresh" class="primary" type="button">刷新数据</button>
+      </div>
+    </header>
+
+    <div class="notice" role="note">
+      <strong>数据说明</strong>
+      首页仅展示有限的最新交易，可能漏采；记录缺少订单编号和成交时间，同款同价交易可能被合并。
+      金额按首次观察到成功的日期统计，不代表平台全部成交额。
+    </div>
+
+    <section aria-labelledby="overview-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">DAILY OVERVIEW</p><h2 id="overview-heading">每日概览</h2></div>
+        <p id="last-update" class="muted">正在加载…</p>
+      </div>
+      <div class="metric-grid">
+        <article class="card metric accent">
+          <p>新增成功条目金额</p><strong id="success-money">—</strong><small id="success-count">—</small>
+        </article>
+        <article class="card metric accent">
+          <p>当日观察到的交易中金额</p><strong id="observed-pending-money">—</strong><small id="observed-pending-count">—</small>
+        </article>
+        <article class="card metric">
+          <p>最后一次采集的交易中金额</p><strong id="snapshot-pending-money">—</strong><small id="snapshot-pending-count">—</small>
+        </article>
+        <article class="card metric">
+          <p>新增进行中条目金额</p><strong id="pending-money">—</strong><small id="pending-count">—</small>
+        </article>
+        <article class="card metric">
+          <p>平台指数观测增量</p><strong id="index-money">—</strong><small id="index-count">—</small>
+        </article>
+        <article class="card metric">
+          <p>采集运行</p><strong id="run-count">—</strong><small id="run-detail">—</small>
+        </article>
+      </div>
+      <p class="footnote">当日观察包含启动时已有的交易，同一条目当天多次出现只计一次；它可能后来交易成功，请勿与成功金额相加。最后一次采集显示所选日期最后一次成功采集时的交易中条目。</p>
+      <div id="warnings" class="warnings" aria-live="polite"></div>
+      <p id="baseline" class="footnote"></p>
+      <p id="index-window" class="footnote"></p>
+      <p id="trial" class="footnote"></p>
+    </section>
+
+    <section aria-labelledby="detail-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">TRANSACTIONS</p><h2 id="detail-heading">交易明细</h2></div>
+        <a id="export" class="secondary button-link" href="#">导出 CSV</a>
+      </div>
+      <div class="card panel">
+        <div class="filters">
+          <label>统计类别
+            <select id="status">
+              <option value="all">全部类别</option>
+              <option value="success">新增成功</option>
+              <option value="observed_pending">当日观察到交易中</option>
+              <option value="snapshot_pending">最后采集交易中</option>
+              <option value="pending">新增进行中</option>
+              <option value="baseline">启动时存量</option>
+              <option value="unknown">未知状态</option>
+            </select>
+          </label>
+          <label class="search">商品关键词
+            <input id="search" type="search" placeholder="搜索商品名称" maxlength="200">
+          </label>
+          <p class="muted" id="row-count"></p>
+        </div>
+        <p class="footnote">同一条目可能先后进入“新增进行中”和“新增成功”，因此全部类别中可能显示两行。</p>
+        <div class="table-wrap">
+          <table><thead><tr><th>统计类别</th><th>商品</th><th>金额</th><th>买家</th><th>状态</th><th>观察时间</th></tr></thead>
+          <tbody id="transactions"></tbody></table>
+        </div>
+        <p id="empty-transactions" class="empty" hidden>当天没有符合条件的观察记录。</p>
+      </div>
+    </section>
+
+    <div class="two-column">
+      <section aria-labelledby="products-heading">
+        <div class="section-heading"><div><p class="eyebrow">PRODUCTS</p><h2 id="products-heading">当日成功商品</h2></div></div>
+        <div class="card panel">
+          <div class="table-wrap"><table><thead><tr><th>商品</th><th>条目</th><th>金额</th></tr></thead><tbody id="products"></tbody></table></div>
+          <p id="empty-products" class="empty" hidden>当天暂无新增成功条目。</p>
+        </div>
+      </section>
+      <section aria-labelledby="trend-heading">
+        <div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2 id="trend-heading">近 14 日趋势</h2></div></div>
+        <div class="card panel">
+          <p class="footnote">橙色柱为观察到的成功金额；平台指数是另一个口径。</p>
+          <div id="trend-chart" class="chart" aria-label="每日新增成功条目金额趋势"></div>
+          <div class="table-wrap trend-table"><table><thead><tr><th>日期</th><th>观察成功金额</th><th>指数观测增量</th></tr></thead><tbody id="trend"></tbody></table></div>
+        </div>
+      </section>
+    </div>
+    <footer>公开交易观察 · 本地数据 · 北京时间</footer>
+  </div>
+  <script src="/static/app.js?v=20261030-2" defer></script>
+</body>
+</html>
