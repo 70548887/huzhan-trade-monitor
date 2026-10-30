@@ -12,6 +12,7 @@ FEED_URL = HOME_URL + "apage/"
 PORT = 8878
 RAW_RETENTION_DAYS = 90
 BACKUP_RETENTION_COUNT = 30
+COOKIE_SECURE = os.environ.get("HUZHAN_COOKIE_SECURE", "0").strip().lower() in ("1", "true", "yes")
 
 
 def now_beijing() -> datetime:

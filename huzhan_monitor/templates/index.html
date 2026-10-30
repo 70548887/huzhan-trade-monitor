@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>互站交易监控</title>
-  <link rel="stylesheet" href="/static/style.css?v=20261030-2">
+  <link rel="stylesheet" href="/static/style.css?v=0.2.0">
+  <link rel="stylesheet" href="/static/account.css?v=0.2.0">
 </head>
 <body>
   <div class="shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow"><span class="live-dot"></span> 本地监控</p>
+        <p class="eyebrow"><span class="live-dot"></span> 私有监控</p>
         <h1>互站交易监控</h1>
         <p class="subheading">查看公开交易动态与每日观察数据</p>
       </div>
@@ -22,6 +23,9 @@
         <button id="refresh" class="primary" type="button">刷新数据</button>
       </div>
     </header>
+
+    {% set active_page = 'overview' %}
+    {% include '_navigation.html' %}
 
     <div class="notice" role="note">
       <strong>数据说明</strong>
@@ -52,13 +56,11 @@
         </article>
         <article class="card metric">
           <p>采集运行</p><strong id="run-count">—</strong><small id="run-detail">—</small>
+          <a id="collection-link" class="metric-link" href="/logs">查看运行日志 →</a>
         </article>
       </div>
       <p class="footnote">当日观察包含启动时已有的交易，同一条目当天多次出现只计一次；它可能后来交易成功，请勿与成功金额相加。最后一次采集显示所选日期最后一次成功采集时的交易中条目。</p>
-      <div id="warnings" class="warnings" aria-live="polite"></div>
-      <p id="baseline" class="footnote"></p>
-      <p id="index-window" class="footnote"></p>
-      <p id="trial" class="footnote"></p>
+      <div id="load-error" class="warnings" role="alert" hidden></div>
     </section>
 
     <section aria-labelledby="detail-heading">
@@ -112,6 +114,6 @@
     </div>
     <footer>公开交易观察 · 本地数据 · 北京时间</footer>
   </div>
-  <script src="/static/app.js?v=20261030-2" defer></script>
+  <script src="/static/app.js?v=0.2.0" defer></script>
 </body>
 </html>

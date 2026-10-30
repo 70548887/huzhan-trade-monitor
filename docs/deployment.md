@@ -6,6 +6,30 @@
 
 本指南的宝塔原生示例使用 `38761` 端口。现有 Docker 和 Windows 配置默认使用 `8878`。端口以实际启动配置为准，反向代理必须指向相同端口。
 
+<a id="account"></a>
+
+## 首次登录与管理员账号
+
+从 v0.2.0 起默认启用登录保护。没有默认密码，也没有公开注册入口；未初始化账号时，首页和数据接口保持锁定。账号存于现有 SQLite 数据库，不会覆盖交易记录。
+
+**宝塔最简配置**：在项目的“环境变量”中指定 `HUZHAN_ADMIN_USERNAME=admin`，将 `HUZHAN_ADMIN_PASSWORD` 设为自己选择的密码（至少 12 个字符），然后重启项目。首次创建成功后可以移除密码环境变量；已有管理员时，这两个变量不会覆盖账号。
+
+**本机命令方式**：在项目根目录，使用实际项目环境的 Python 执行以下命令，按提示输入两次密码：
+
+```bash
+python -m huzhan_monitor.admin --username admin
+```
+
+这里的 `python` 代表项目实际解释器。宝塔环境中使用其完整路径，并以与网页相同的用户执行；Windows 使用 `.venv\Scripts\python.exe`；Docker 已启动时可用 `docker compose exec web python -m huzhan_monitor.admin --username admin`。
+
+忘记密码时，在上述命令末尾加 `--reset`。重置会撤销所有登录会话。用户名支持 3–64 位英文字母、数字及 `_ . @ -`，密码支持 12–1024 个字符；账号不能在网页中注册或重置。
+
+网页会话最长 12 小时。相同来源在 15 分钟内连续尝试达到限制时，需要等待窗口结束再重试。`/health` 只返回服务状态，不包含交易数据，因此仍允许未登录访问。
+
+### HTTPS 反向代理
+
+公网登录需使用 HTTPS，并设置 `HUZHAN_COOKIE_SECURE=1`。本地纯 HTTP 调试保持为 `0`，否则浏览器不会发送登录 Cookie。代理应保留客户端的 Host（Nginx 例如 `proxy_set_header Host $http_host;`）；不要把 Host 替换成后端的 `127.0.0.1`，否则登录表单校验可能失败。
+
 <a id="baota"></a>
 
 ## 宝塔 Python 项目
@@ -33,7 +57,7 @@
 - **项目路径**：`/www/wwwroot/huzhan-trade-monitor`。
 - **启动用户**：`www`；如使用其他用户，后续目录权限和采集任务也应使用该用户。
 - **安装依赖包**：选择项目根目录的 `requirements.txt`，或在该项目环境中安装此文件中的依赖。
-- **环境变量**：默认无需填写；自定义存储位置见[数据目录](#data)。
+- **环境变量**：按[账号配置](#account)初始化管理员；自定义存储位置见[数据目录](#data)。
 - **开机启动**：按需启用，长期监控时建议启用。
 
 启动命令：
@@ -66,7 +90,7 @@ curl --fail --silent --show-error http://127.0.0.1:38761/health
 http://127.0.0.1:38761
 ```
 
-`127.0.0.1` 只供服务器本机访问；其他电脑或手机通过配置好的站点域名访问。应用尚无登录功能，公网访问应在反向代理层配置访问验证或来源限制，并启用 HTTPS。
+`127.0.0.1` 只供服务器本机访问；其他电脑或手机通过配置好的站点域名访问。首次访问会显示登录页，请完成[管理员初始化和 HTTPS 配置](#account)。
 
 ### 4. 配置每 10 分钟采集
 
@@ -101,6 +125,8 @@ cd huzhan-trade-monitor
 docker compose up -d --build
 docker compose ps
 ```
+
+首次启动后可执行 `docker compose exec web python -m huzhan_monitor.admin --username admin` 创建账号。也可在启动前把 `.env.example` 复制为 `.env`，填写自己的初始密码。`.env` 不会提交到 GitHub；不要使用示例或公开密码。已创建账号后，移除初始密码变量不会影响账号。
 
 `git clone` 获取 `main` 分支最新代码；如需固定版本，可下载对应 Release 的源码包，在解压后的项目根目录运行 Compose 命令。保持部署目录和 Compose 项目名不变，避免更新时创建新的数据卷。
 
@@ -139,7 +165,8 @@ docker compose down
 
 1. 安装 Python 3.12，确保终端可以执行 `python`。
 2. 将源码解压到固定目录，双击 `安装定时任务.bat`。脚本会创建 `.venv`、安装依赖、注册任务并启动网页服务。
-3. 双击 `启动监控.bat`，或打开 `http://127.0.0.1:8878/`。
+3. 在项目目录执行 `.\.venv\Scripts\python.exe -m huzhan_monitor.admin --username admin`，按提示创建账号。
+4. 双击 `启动监控.bat`，或打开 `http://127.0.0.1:8878/`，使用刚创建的账号登录。
 
 这里的 `.venv` 由 Windows 安装脚本创建，与宝塔管理的环境是两种部署方式。
 
@@ -168,6 +195,8 @@ Windows 脚本默认使用 `8878`，没有提供端口环境变量。发生端�
 - Windows 任务与网页日志：`logs/task-output.log`、`logs/server-out.log`、`logs/server-error.log`。
 
 原生部署可使用 `HUZHAN_MONITOR_DATA_DIR` 和 `HUZHAN_MONITOR_LOG_DIR` 环境变量更改目录。网页服务和采集任务必须设置为同一路径。Docker 默认使用挂载命名卷的 `/app/data` 和 `/app/logs`。
+
+数据库和备份也包含管理员密码哈希及会话记录，需要妥善保管。账号密码不写入采集日志；不要公开上传数据库、备份或本地生成的凭据文件。
 
 ### 备份与迁移
 

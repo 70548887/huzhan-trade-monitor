@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>运行日志 · 互站交易监控</title>
+  <link rel="stylesheet" href="/static/style.css?v=0.2.0">
+  <link rel="stylesheet" href="/static/account.css?v=0.2.0">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow"><span class="live-dot"></span> 私有监控</p>
+        <h1>互站交易监控</h1>
+        <p class="subheading">查看采集记录、运行提醒与监控覆盖情况</p>
+      </div>
+      <div class="toolbar">
+        <label for="day">查看日期</label>
+        <input id="day" type="date">
+        <button id="today" class="secondary" type="button">今天</button>
+        <button id="refresh" class="primary" type="button">刷新日志</button>
+      </div>
+    </header>
+    {% set active_page = 'logs' %}
+    {% include '_navigation.html' %}
+
+    <section aria-labelledby="log-overview-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">COLLECTION STATUS</p><h2 id="log-overview-heading">采集状态</h2></div>
+        <p id="last-update" class="muted">正在加载…</p>
+      </div>
+      <div class="metric-grid log-metrics">
+        <article class="card metric"><p>执行次数</p><strong id="total-count">—</strong><small>所选日期的采集任务</small></article>
+        <article class="card metric accent"><p>采集成功</p><strong id="success-count">—</strong><small id="success-rate">—</small></article>
+        <article class="card metric"><p>采集失败</p><strong id="failed-count">—</strong><small id="running-count">—</small></article>
+        <article class="card metric"><p>重复展示行</p><strong id="duplicate-count">—</strong><small>各轮采集中的重复行合计</small></article>
+      </div>
+      <div id="load-error" class="warnings" role="alert" hidden></div>
+    </section>
+
+    <section aria-labelledby="notices-heading">
+      <div class="section-heading"><div><p class="eyebrow">RUNTIME NOTICES</p><h2 id="notices-heading">运行提醒</h2></div></div>
+      <div class="card panel">
+        <div id="notices" class="runtime-notices" aria-live="polite"></div>
+        <p id="empty-notices" class="muted" hidden>当天没有需要关注的运行提醒。</p>
+        <div class="runtime-context">
+          <p id="baseline" class="footnote"></p>
+          <p id="index-window" class="footnote"></p>
+          <p id="trial" class="footnote"></p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="runs-heading">
+      <div class="section-heading"><div><p class="eyebrow">RUN HISTORY</p><h2 id="runs-heading">采集记录</h2></div></div>
+      <div class="card panel">
+        <div class="filters">
+          <label for="status">执行结果
+            <select id="status">
+              <option value="all">全部结果</option>
+              <option value="success">采集成功</option>
+              <option value="failed">采集失败</option>
+              <option value="running">运行中</option>
+            </select>
+          </label>
+          <p id="row-count" class="muted"></p>
+        </div>
+        <div class="table-wrap">
+          <table class="logs-table"><thead><tr><th>编号</th><th>开始时间</th><th>完成时间</th><th>结果</th><th>耗时</th><th>展示行</th><th>重复行</th><th>错误详情</th></tr></thead><tbody id="runs"></tbody></table>
+        </div>
+        <p id="empty-runs" class="empty" hidden>当天没有符合条件的采集记录。</p>
+        <div class="pagination" aria-label="采集记录分页">
+          <span id="page-label" class="muted"></span>
+          <div class="pagination-buttons">
+            <button id="previous-page" class="secondary" type="button" disabled>上一页</button>
+            <button id="next-page" class="secondary" type="button" disabled>下一页</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <footer>公开交易观察 · 运行日志 · 北京时间</footer>
+  </div>
+  <script src="/static/logs.js?v=0.2.0" defer></script>
+</body>
+</html>

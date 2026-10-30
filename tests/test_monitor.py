@@ -8,8 +8,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from bs4 import BeautifulSoup
 
-from huzhan_monitor import collector, db, reports, settings
+from huzhan_monitor import auth, collector, db, reports, settings
 from huzhan_monitor.web import app
 
 
@@ -105,7 +106,9 @@ class MonitorTest(unittest.TestCase):
             self.assertEqual(conn.execute("SELECT status FROM runs WHERE id=?", (first,)).fetchone()[0], "failed")
         history = reports.coverage(date(2026, 1, 1), now=self.start + timedelta(hours=1))
         self.assertEqual(len(history["failures"]), 2)
-        self.assertTrue(history["gaps"])
+        # Monitoring only began at 23:50, so the earlier part of the day is
+        # unobserved, not a fabricated 24-hour outage.
+        self.assertFalse(history["gaps"])
 
     def test_report_export_and_product_totals(self):
         self.collect(self.start, [row(buyer="base", status="pending")])
@@ -116,6 +119,10 @@ class MonitorTest(unittest.TestCase):
         summary = reports.daily_summary(target)
         products = reports.product_summary(target)
         with TestClient(app) as client:
+            auth.set_admin("testadmin", "test-password-12345", reset=True)
+            login_page = client.get("/login")
+            csrf = BeautifulSoup(login_page.text, "html.parser").select_one('[name="csrf_token"]')["value"]
+            client.post("/login", data={"username": "testadmin", "password": "test-password-12345", "csrf_token": csrf})
             response = client.get("/api/export.csv", params={"day": target.isoformat(), "status": "success"})
         records = list(csv.DictReader(io.StringIO(response.content.decode("utf-8-sig"))))
         self.assertEqual(response.status_code, 200)

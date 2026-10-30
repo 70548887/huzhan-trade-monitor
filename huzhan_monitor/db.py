@@ -305,5 +305,5 @@ def evaluate_trial(at: datetime | None = None) -> dict | None:
             "failed_count": failed, "max_gap_minutes": round(max_gap / 60, 1),
             "passed": len(times) >= 144 and failed == 0 and max_gap <= 15 * 60,
         }
-        conn.execute("INSERT INTO metadata(key,value) VALUES('trial_report',?)", (json.dumps(report),))
+        conn.execute("INSERT OR IGNORE INTO metadata(key,value) VALUES('trial_report',?)", (json.dumps(report),))
         return report

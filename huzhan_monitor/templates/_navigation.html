@@ -1,0 +1,13 @@
+<nav class="main-nav" aria-label="主导航">
+  <div class="nav-links">
+    <a id="overview-link" href="/" class="nav-link{% if active_page == 'overview' %} active{% endif %}"{% if active_page == 'overview' %} aria-current="page"{% endif %}>交易概览</a>
+    <a id="logs-link" href="/logs" class="nav-link{% if active_page == 'logs' %} active{% endif %}"{% if active_page == 'logs' %} aria-current="page"{% endif %}>运行日志</a>
+  </div>
+  <div class="account-controls">
+    <span class="account-name" title="当前登录账户">{{ user.username }}</span>
+    <form action="/logout" method="post">
+      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+      <button class="logout-button" type="submit">退出登录</button>
+    </form>
+  </div>
+</nav>

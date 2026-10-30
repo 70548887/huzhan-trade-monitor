@@ -237,6 +237,7 @@ def coverage(day: date, now: datetime | None = None) -> dict:
         baseline_row = conn.execute(
             "SELECT value FROM metadata WHERE key='baseline_completed'"
         ).fetchone()
+        first_run = conn.execute("SELECT MIN(started_at) AS started_at FROM runs").fetchone()
         success = conn.execute(
             "SELECT finished_at FROM runs WHERE status='success' AND finished_at >= ? "
             "AND finished_at <= ? ORDER BY finished_at", (settings.stamp(start), settings.stamp(end))
@@ -249,17 +250,14 @@ def coverage(day: date, now: datetime | None = None) -> dict:
             "SELECT started_at,error FROM runs WHERE status='failed' AND started_at >= ? "
             "AND started_at < ? ORDER BY started_at DESC", (settings.stamp(start), settings.stamp(end))
         ).fetchall()
+    started_at = first_run["started_at"] or (baseline_row["value"] if baseline_row else None)
+    if started_at is None or datetime.fromisoformat(started_at) >= end:
+        return {"gaps": [], "failures": [dict(r) for r in failures], "stale": False}
     times = [datetime.fromisoformat(r["finished_at"]) for r in success]
     if prior:
         start_anchor = datetime.fromisoformat(prior["finished_at"])
-    elif baseline_row:
-        start_anchor = max(start, datetime.fromisoformat(baseline_row["value"]))
     else:
-        start_anchor = start
-    # A future baseline means the selected historical date was never monitored.
-    if start_anchor > end:
-        return {"gaps": [{"start": settings.stamp(start), "end": settings.stamp(end), "minutes": round((end-start).total_seconds()/60, 1)}],
-                "failures": [dict(r) for r in failures], "stale": True}
+        start_anchor = max(start, datetime.fromisoformat(started_at))
     edges = [start_anchor, *times, end]
     gaps = [
         {"start": settings.stamp(max(a, start)), "end": settings.stamp(b),
@@ -268,6 +266,72 @@ def coverage(day: date, now: datetime | None = None) -> dict:
     ]
     return {"gaps": gaps, "failures": [dict(r) for r in failures],
             "stale": bool(day == now.date() and gaps and gaps[-1]["end"] == settings.stamp(end))}
+
+
+def run_log_report(day: date, status: str = "all", page: int = 1, page_size: int = 50) -> dict:
+    start, end = day_bounds(day)
+    where = "started_at>=? AND started_at<?"
+    params: list = [start, end]
+    if status != "all":
+        where += " AND status=?"
+        params.append(status)
+    with db.connect() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM runs WHERE " + where, params).fetchone()[0]
+        pages = max(1, (total + page_size - 1) // page_size)
+        page = min(page, pages)
+        rows = conn.execute(
+            "SELECT id,started_at,finished_at,status,error,row_count,duplicate_count FROM runs WHERE "
+            + where + " ORDER BY started_at DESC,id DESC LIMIT ? OFFSET ?",
+            [*params, page_size, (page - 1) * page_size],
+        ).fetchall()
+        counts = conn.execute(
+            "SELECT status,COUNT(*) AS count,COALESCE(SUM(duplicate_count),0) AS duplicates "
+            "FROM runs WHERE started_at>=? AND started_at<? GROUP BY status", (start, end),
+        ).fetchall()
+        meta = dict(conn.execute(
+            "SELECT key,value FROM metadata WHERE key IN ('baseline_completed','trial_started','maintenance_error')"
+        ).fetchall())
+        first_run = conn.execute("SELECT MIN(started_at) AS started_at FROM runs").fetchone()[0]
+    entries = []
+    for record in rows:
+        entry = dict(record)
+        entry["duration_seconds"] = (
+            max(0, round((datetime.fromisoformat(entry["finished_at"]) - datetime.fromisoformat(entry["started_at"])).total_seconds(), 1))
+            if entry["finished_at"] else None
+        )
+        entries.append(entry)
+    counts_summary = {"total": 0, "success": 0, "failed": 0, "running": 0, "duplicates": 0}
+    for item in counts:
+        counts_summary[item["status"]] = item["count"]
+        counts_summary["total"] += item["count"]
+        counts_summary["duplicates"] += item["duplicates"]
+    daily = daily_summary(day)
+    covered = coverage(day)
+    index = platform_index(day)
+    notices = []
+    if first_run is None:
+        notices.append({"level": "info", "message": "尚未执行采集。请先配置采集计划任务并运行一次，网页服务本身不会自动采集。"})
+    elif not daily["available"]:
+        notices.append({"level": "warning" if counts_summary["total"] else "info",
+                        "message": "所选日期没有成功采集记录，无法判断当天的交易金额。"})
+    for gap in covered["gaps"]:
+        notices.append({"level": "warning", "message": f"采集间隔缺口：{gap['start']} 至 {gap['end']}（该日期内 {gap['minutes']} 分钟）。"})
+    if counts_summary["failed"]:
+        notices.append({"level": "error", "message": f"所选日期有 {counts_summary['failed']} 次采集失败，可筛选失败记录查看具体原因。"})
+    if index["start_at"] and (not index["start_boundary_ok"] or not index["end_boundary_ok"]):
+        notices.append({"level": "warning", "message": "指数缺少靠近日期边界的快照，实际观测区间不等于完整自然日。"})
+    if index["rollback"]:
+        notices.append({"level": "error", "message": "平台累计指数出现回退，已停止计算该区间增量。"})
+    if meta.get("maintenance_error"):
+        notices.append({"level": "error", "message": "当前备份或试运行评估异常：" + meta["maintenance_error"]})
+    return {
+        "date": day.isoformat(), "entries": entries, "page": page, "page_size": page_size,
+        "total": total, "pages": pages, "summary": counts_summary, "notices": notices,
+        "last_success_at": daily["last_success_at"], "baseline_at": meta.get("baseline_completed"),
+        "trial": db.evaluate_trial(), "trial_started_at": meta.get("trial_started"),
+        "index_window": {"start_at": index["start_at"] if index["end_at"] else None,
+                         "end_at": index["end_at"] if index["start_at"] else None},
+    }
 
 
 def trend(end_day: date, days: int = 14) -> list[dict]:

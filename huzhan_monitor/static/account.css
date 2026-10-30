@@ -1,0 +1,49 @@
+[hidden]{display:none!important}
+.main-nav{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 24px;padding:7px;background:#fff;border:1px solid #e5ebf3;border-radius:11px}
+.nav-links,.account-controls{display:flex;align-items:center;gap:6px}
+.nav-link{color:#708097;text-decoration:none;font-size:14px;font-weight:600;padding:11px 20px;border-radius:7px}
+.nav-link:hover{background:#f5f7fa;color:#263c59}
+.nav-link.active{background:#fff0e5;color:#d56a2d}
+.account-controls{padding:0 8px;gap:13px;min-width:0}
+.account-name{font-size:12px;color:#7a8a9e;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-controls form{margin:0}
+.logout-button{height:32px;padding:0 9px;color:#64768d;background:transparent;font-size:12px;font-weight:400}
+.logout-button:hover{background:#f2f5f9;color:#293c57}
+.metric-link{display:inline-block;margin-top:9px;font-size:12px;text-decoration:none;color:#5176a1}
+.metric-link:hover{text-decoration:underline}
+.log-metrics{grid-template-columns:repeat(4,1fr)}
+.runtime-notices{display:grid;gap:8px}
+.warning.info{background:#f1f5fa;color:#657c99}
+.runtime-context{margin-top:14px;padding-top:3px;border-top:1px solid #eff2f7}
+.logs-table td{font-size:12px}
+.log-time,.log-number{white-space:nowrap}
+.tag.failed{background:#fff0ed;color:#b05a45}
+.tag.running{background:#fff3e8;color:#c66b24}
+.log-error{min-width:100px;max-width:480px}
+.log-error summary{cursor:pointer;color:#a95b41;font-size:12px}
+.log-error pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#fff5f1;border:1px solid #f6e4dc;border-radius:7px;color:#8c5544;padding:10px;line-height:1.6;font-family:Consolas,"Microsoft YaHei UI",monospace;font-size:11px;max-height:250px;overflow:auto}
+.pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:18px}
+.pagination-buttons{display:flex;gap:8px}
+button:disabled{cursor:not-allowed;opacity:.5}
+.login-page{min-height:100vh;background:radial-gradient(ellipse at 50% 0,#fff4ea 0,transparent 52%),#f3f6fa}
+.login-shell{max-width:440px;margin:0 auto;padding:70px 18px 30px}
+.login-brand{text-align:center;margin-bottom:28px}
+.brand-mark{width:52px;height:52px;display:flex;justify-content:center;align-items:center;background:#ed7b3d;color:#fff;font-size:25px;font-weight:700;border-radius:15px;margin:0 auto 19px;box-shadow:0 8px 22px #ee773c22}
+.login-brand h1{font-size:26px;margin:10px 0}
+.login-brand .subheading{margin-top:10px}
+.login-card{padding:28px}
+.login-card h2{font-size:20px}
+.login-description{font-size:12px;color:#8896a8;line-height:1.7;margin-top:9px}
+.login-message{margin-top:18px}
+.login-form{display:flex;flex-direction:column;margin-top:21px}
+.login-form label{font-size:12px;color:#65778f;margin-bottom:8px}
+.login-form input:not([type=hidden]){width:100%;height:43px;margin-bottom:19px}
+.login-form input:disabled{background:#f4f6f9}
+.login-submit{height:43px;margin-top:3px}
+.setup-message{margin-top:18px;padding:13px;background:#fff8ef;border:1px solid #f5dfc6;border-radius:9px;color:#826044;font-size:12px;line-height:1.7}
+.setup-message strong{font-weight:600}
+.setup-message p{margin-top:7px}
+.setup-message code{display:block;background:#fffdf9;border-radius:5px;margin-top:10px;padding:8px;overflow-wrap:anywhere;white-space:normal;font-size:11px}
+.login-footer{text-align:center;color:#99a7b9;font-size:11px;margin-top:22px}
+@media(max-width:1000px){.log-metrics{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.main-nav{gap:8px;flex-wrap:wrap}.nav-links{flex:1}.nav-link{padding:10px 14px}.account-controls{gap:5px}.account-name{max-width:95px}.logout-button{padding:0 5px}.log-metrics{gap:8px}.login-shell{padding-top:40px}.login-card{padding:22px}.pagination{align-items:flex-start;flex-direction:column}.pagination-buttons{align-self:flex-end}.log-error{max-width:260px}}

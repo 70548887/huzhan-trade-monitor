@@ -21,6 +21,10 @@ function beijingDate() {
 }
 async function getJson(url) {
   const response = await fetch(url, {cache:"no-store"});
+  if (response.status === 401) {
+    window.location.assign("/login?next=%2F");
+    throw new Error("登录已过期，请重新登录");
+  }
   if (!response.ok) throw new Error(`请求失败（${response.status}）`);
   return response.json();
 }
@@ -41,32 +45,6 @@ function renderSummary(data) {
   $("#run-count").textContent = `${data.runs.success || 0} / ${data.runs.total || 0}`;
   $("#run-detail").textContent = `成功 / 执行；失败 ${data.runs.failed || 0} 次`;
   $("#last-update").textContent = `最近成功采集 ${stamp(data.last_success_at)}`;
-  const platform = data.platform;
-  $("#index-window").textContent = `指数观测区间：${stamp(platform.start_at)} 至 ${stamp(platform.end_at)}${platform.partial ? "（当天截至最近快照）" : ""}。`;
-  const warnings = [];
-  if (!data.available)
-    warnings.push("当天没有成功采集，无法判断当天的交易金额。");
-  if (data.coverage.gaps.length)
-    warnings.push(`存在 ${data.coverage.gaps.length} 段超过 15 分钟的采集间隔：` + data.coverage.gaps.slice(0, 3).map((g) => `${stamp(g.start)} 至 ${stamp(g.end)}（${g.minutes} 分钟）`).join("；") + (data.coverage.gaps.length > 3 ? "；其余间隔请检查运行日志。" : "。"));
-  if (data.coverage.failures.length)
-    warnings.push(`${data.coverage.failures.length} 次采集失败；最近一次：${stamp(data.coverage.failures[0].started_at)} ${data.coverage.failures[0].error || ""}`);
-  if (!platform.start_boundary_ok || !platform.end_boundary_ok)
-    warnings.push("指数缺少靠近日期边界的快照，显示的是实际观测区间的变化，不是完整自然日数值。");
-  if (platform.rollback)
-    warnings.push("平台累计指数出现回退，已停止计算该区间增量，请检查源数据。");
-  if (data.latest_run?.status === "failed")
-    warnings.push(`最近一次采集失败：${data.latest_run.error || "未知错误"}`);
-  $("#baseline").textContent = data.baseline_at ? `首次有效采集：${stamp(data.baseline_at)}；此前没有监控记录。` : "尚无首次有效采集。";
-  if (data.maintenance_error)
-    warnings.push(`备份或试运行评估失败：${data.maintenance_error}`);
-  $("#warnings").innerHTML = warnings.map((message) => `<div class="warning">${escapeHtml(message)}</div>`).join("");
-  if (data.trial) {
-    $("#trial").textContent = `24 小时试运行：${data.trial.passed ? "通过" : "有缺口或失败"}；成功 ${data.trial.success_count} 次，失败 ${data.trial.failed_count} 次，最大间隔 ${data.trial.max_gap_minutes} 分钟。`;
-  } else if (data.trial_started_at) {
-    $("#trial").textContent = `24 小时试运行进行中，开始时间 ${stamp(data.trial_started_at)}。`;
-  } else {
-    $("#trial").textContent = "尚未完成首次有效采集。";
-  }
 }
 function renderRows(rows) {
   $("#transactions").innerHTML = rows.map((row) => `<tr>
@@ -92,6 +70,9 @@ async function refresh() {
   const version = ++requestVersion;
   const params = query();
   $("#export").href = "/api/export.csv?" + params.toString();
+  const logUrl = "/logs?day=" + encodeURIComponent($("#day").value);
+  $("#logs-link").href = logUrl;
+  $("#collection-link").href = logUrl;
   try {
     const day = encodeURIComponent($("#day").value);
     const [summary, transactions, products, trend] = await Promise.all([
@@ -105,12 +86,15 @@ async function refresh() {
     renderRows(transactions.items);
     renderProducts(products.items, summary.available);
     renderTrend(trend.items);
+    $("#load-error").hidden = true;
   } catch (error) {
     if (version !== requestVersion) return;
-    $("#warnings").innerHTML = `<div class="warning error">加载失败：${escapeHtml(error.message)}</div>`;
+    $("#load-error").hidden = false;
+    $("#load-error").innerHTML = `<div class="warning error">加载失败：${escapeHtml(error.message)}</div>`;
   }
 }
-$("#day").value = beijingDate();
+const initialDay = new URLSearchParams(window.location.search).get("day");
+$("#day").value = initialDay && /^\d{4}-\d{2}-\d{2}$/.test(initialDay) ? initialDay : beijingDate();
 $("#day").addEventListener("change", refresh);
 $("#status").addEventListener("change", refresh);
 $("#today").addEventListener("click", () => { $("#day").value = beijingDate(); refresh(); });

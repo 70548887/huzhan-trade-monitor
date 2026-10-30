@@ -3,6 +3,10 @@ services:
     image: huzhan-trade-monitor:local
     build: .
     restart: unless-stopped
+    environment:
+      HUZHAN_ADMIN_USERNAME: ${HUZHAN_ADMIN_USERNAME:-admin}
+      HUZHAN_ADMIN_PASSWORD: ${HUZHAN_ADMIN_PASSWORD:-}
+      HUZHAN_COOKIE_SECURE: ${HUZHAN_COOKIE_SECURE:-0}
     ports:
       - "127.0.0.1:8878:8878"
     volumes:
