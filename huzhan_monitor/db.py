@@ -299,11 +299,16 @@ def evaluate_trial(at: datetime | None = None) -> dict | None:
         edges = [start, *times, end]
         max_gap = max((b - a).total_seconds() for a, b in zip(edges, edges[1:]))
         failed = sum(r["status"] != "success" for r in records)
+        from . import cadence, preferences
+        interval_history = preferences.get_history()
+        overdue_gaps = sum(cadence.is_overdue(a, b, interval_history) for a, b in zip(edges, edges[1:]))
         report = {
             "started_at": settings.stamp(start), "ended_at": settings.stamp(end),
             "checked_at": settings.stamp(at), "success_count": len(times),
             "failed_count": failed, "max_gap_minutes": round(max_gap / 60, 1),
-            "passed": len(times) >= 144 and failed == 0 and max_gap <= 15 * 60,
+            "expected_count": cadence.expected_collections(start, end, interval_history),
+            "overdue_gaps": overdue_gaps,
+            "passed": bool(times) and failed == 0 and overdue_gaps == 0,
         }
         conn.execute("INSERT OR IGNORE INTO metadata(key,value) VALUES('trial_report',?)", (json.dumps(report),))
         return report

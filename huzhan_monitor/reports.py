@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
-from . import db, settings
+from . import cadence, db, preferences, settings
 
 STATUS_CHOICES = {"success", "pending", "unknown", "baseline", "observed_pending", "snapshot_pending"}
 
@@ -259,10 +259,11 @@ def coverage(day: date, now: datetime | None = None) -> dict:
     else:
         start_anchor = max(start, datetime.fromisoformat(started_at))
     edges = [start_anchor, *times, end]
+    interval_history = preferences.get_history()
     gaps = [
         {"start": settings.stamp(max(a, start)), "end": settings.stamp(b),
          "minutes": round((b - max(a, start)).total_seconds()/60, 1)}
-        for a, b in zip(edges, edges[1:]) if b - a > timedelta(minutes=15)
+        for a, b in zip(edges, edges[1:]) if cadence.is_overdue(a, b, interval_history)
     ]
     return {"gaps": gaps, "failures": [dict(r) for r in failures],
             "stale": bool(day == now.date() and gaps and gaps[-1]["end"] == settings.stamp(end))}
@@ -329,6 +330,7 @@ def run_log_report(day: date, status: str = "all", page: int = 1, page_size: int
     return {
         "date": day.isoformat(), "entries": entries, "page": page, "page_size": page_size,
         "auto_collect": settings.AUTO_COLLECT,
+        "interval_minutes": preferences.get_interval_minutes(),
         "total": total, "pages": pages, "summary": counts_summary, "notices": notices,
         "last_success_at": daily["last_success_at"], "baseline_at": meta.get("baseline_completed"),
         "trial": db.evaluate_trial(), "trial_started_at": meta.get("trial_started"),

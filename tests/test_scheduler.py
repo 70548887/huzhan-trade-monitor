@@ -96,6 +96,41 @@ class SchedulerTest(unittest.TestCase):
         self.assertTrue(collected.wait(1))
         self.assertTrue(scheduler.stop(timeout=1))
 
+    def test_shorter_interval_takes_effect_without_restarting(self):
+        interval = [1.0]
+        first, second = threading.Event(), threading.Event()
+        count = [0]
+        def callback():
+            count[0] += 1
+            (first if count[0] == 1 else second).set()
+            return 0
+        scheduler = Scheduler(interval_provider=lambda: interval[0], retry_seconds=0.01,
+                              collect_func=callback, lock_path=self.lock_path)
+        self.schedulers.append(scheduler)
+        scheduler.start()
+        self.assertTrue(first.wait(1))
+        interval[0] = 0.06
+        self.assertTrue(second.wait(0.5))
+        self.assertTrue(scheduler.stop(timeout=1))
+
+    def test_longer_interval_postpones_the_next_run(self):
+        interval = [0.2]
+        first, second = threading.Event(), threading.Event()
+        count = [0]
+        def callback():
+            count[0] += 1
+            (first if count[0] == 1 else second).set()
+            return 0
+        scheduler = Scheduler(interval_provider=lambda: interval[0], retry_seconds=0.01,
+                              collect_func=callback, lock_path=self.lock_path)
+        self.schedulers.append(scheduler)
+        scheduler.start()
+        self.assertTrue(first.wait(1))
+        interval[0] = 0.6
+        self.assertFalse(second.wait(0.3))
+        self.assertTrue(second.wait(1))
+        self.assertTrue(scheduler.stop(timeout=1))
+
     def test_file_lock_busy_and_released(self):
         with file_lock(self.lock_path) as first:
             self.assertTrue(first)

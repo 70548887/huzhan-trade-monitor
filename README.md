@@ -5,7 +5,7 @@
 ![FastAPI](https://img.shields.io/badge/Web-FastAPI-009688?style=flat-square)
 ![SQLite](https://img.shields.io/badge/Storage-SQLite-003B57?style=flat-square)
 
-每 10 分钟记录互站首页公开的交易动态，按日期查看成功交易、进行中金额和商品明细。
+自动记录互站首页公开的交易动态，按日期查看成功交易、进行中金额和商品明细。默认每 10 分钟采集，可在设置中调整。
 
 [下载版本](https://github.com/70548887/huzhan-trade-monitor/releases/latest) · [宝塔部署](docs/deployment.md#baota) · [Docker 部署](docs/deployment.md#docker) · [Windows 使用](docs/deployment.md#windows) · [常见问题](docs/troubleshooting.md) · [版本记录](CHANGELOG.md)
 
@@ -14,6 +14,7 @@
 ## 功能
 
 - **自动采集**：启动网页项目即在后台采集，此后每 10 分钟执行，保存原始响应、观察时间和状态变化。
+- **频率设置**：登录后在“设置”中选择每小时等常用频率，或自定义 1–1440 分钟，保存后无需重启。
 - **每日概览**：查看新增成功金额、当日观察到的交易中金额及最后一次采集的交易中金额。
 - **商品明细**：按日期、统计类别和商品关键词筛选，支持 CSV 导出。
 - **历史趋势**：展示观察到的每日成功金额，并单独记录平台累计指数的变化。
@@ -74,7 +75,7 @@ Compose 会启动包含网页与自动采集的 `web` 服务，数据通过命�
 - 数据库默认位于 `data/monitor.sqlite3`，结构化历史长期保留。
 - 采集成功后的维护会每天生成一份数据库备份，保留最近 30 份；原始响应保留 90 天。
 - 采集日志默认位于 `logs/collector.log`。Docker 使用命名卷中的 `/app/data` 和 `/app/logs`。
-- 超过 15 分钟的成功采集间隔会显示缺口。恢复后只能获取当前列表，无法补回已经滚出列表的交易。
+- 超过当时设定的采集间隔及 5 分钟宽限期会显示缺口。恢复后只能获取当前列表，无法补回已经滚出列表的交易。
 - 网页、日志、接口和导出统一要求管理员登录。公网部署需启用 HTTPS，并按部署指南设置安全 Cookie。
 
 [查看数据目录、更新与备份说明 →](docs/deployment.md#data)

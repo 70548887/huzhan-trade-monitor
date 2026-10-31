@@ -50,7 +50,7 @@ class AuthenticationAndLogsTest(unittest.TestCase):
     def test_no_admin_and_no_cookie_cannot_read_private_data(self):
         self.assertFalse(auth.is_configured())
         self.assertIn("尚未设置管理员", self.client.get("/login").text)
-        for path in ("/", "/logs"):
+        for path in ("/", "/logs", "/settings"):
             self.assertEqual(self.client.get(path).status_code, 303)
         for path in ("/api/summary", "/api/transactions", "/api/products", "/api/trend", "/api/logs", "/api/export.csv"):
             response = self.client.get(path)
@@ -147,6 +147,46 @@ class AuthenticationAndLogsTest(unittest.TestCase):
         self.assertEqual(result["entries"][0]["error"], "HTTPStatusError: 403 Forbidden")
         empty = self.client.get("/api/logs?day=2026-01-01&status=success").json()
         self.assertEqual(empty["total"], 0)
+
+    def test_frequency_form_saves_persistently_and_updates_logs(self):
+        self.configure()
+        self.login()
+        page = self.client.get("/settings")
+        csrf = BeautifulSoup(page.text, "html.parser").select_one('form[action="/settings"] [name="csrf_token"]')["value"]
+        result = self.client.post("/settings", data={"interval_minutes": "60", "csrf_token": csrf})
+        self.assertEqual(result.status_code, 303)
+        self.assertEqual(result.headers["location"], "/settings?saved=1")
+        self.assertEqual(self.client.get("/api/logs").json()["interval_minutes"], 60)
+        saved = self.client.get("/settings?saved=1")
+        self.assertIn("每 60 分钟", saved.text)
+        self.assertIn("采集间隔已保存", saved.text)
+        from huzhan_monitor import preferences
+        preferences.initialize()
+        self.assertEqual(preferences.get_interval_minutes(), 60)
+
+    def test_multiple_login_tabs_and_icon_do_not_invalidate_login_form(self):
+        self.configure()
+        initial = BeautifulSoup(self.client.get("/login").text, "html.parser")
+        csrf = initial.select_one('[name="csrf_token"]')["value"]
+        self.assertEqual(self.client.get("/favicon.ico").status_code, 204)
+        second = BeautifulSoup(self.client.get("/login").text, "html.parser")
+        self.assertEqual(second.select_one('[name="csrf_token"]')["value"], csrf)
+        response = self.client.post("/login", data={"username": "admin", "password": self.password, "csrf_token": csrf})
+        self.assertEqual(response.status_code, 303)
+
+    def test_frequency_update_requires_login_csrf_and_valid_integer(self):
+        from huzhan_monitor import preferences
+        self.assertEqual(self.client.post("/settings", data={"interval_minutes": "60"}).status_code, 303)
+        self.assertEqual(preferences.get_interval_minutes(), 10)
+        self.configure()
+        self.login()
+        self.assertEqual(self.client.post("/settings", data={"interval_minutes": "60"}).status_code, 403)
+        page = self.client.get("/settings")
+        csrf = BeautifulSoup(page.text, "html.parser").select_one('form[action="/settings"] [name="csrf_token"]')["value"]
+        for value in ("0", "1441", "1.5", "-60", "", "true"):
+            result = self.client.post("/settings", data={"interval_minutes": value, "csrf_token": csrf})
+            self.assertEqual(result.status_code, 400, value)
+            self.assertEqual(preferences.get_interval_minutes(), 10)
 
 
 class EmbeddedCollectionLifecycleTest(unittest.TestCase):

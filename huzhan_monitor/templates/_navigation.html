@@ -2,6 +2,7 @@
   <div class="nav-links">
     <a id="overview-link" href="/" class="nav-link{% if active_page == 'overview' %} active{% endif %}"{% if active_page == 'overview' %} aria-current="page"{% endif %}>交易概览</a>
     <a id="logs-link" href="/logs" class="nav-link{% if active_page == 'logs' %} active{% endif %}"{% if active_page == 'logs' %} aria-current="page"{% endif %}>运行日志</a>
+    <a id="settings-link" href="/settings" class="nav-link{% if active_page == 'settings' %} active{% endif %}"{% if active_page == 'settings' %} aria-current="page"{% endif %}>设置</a>
   </div>
   <div class="account-controls">
     <span class="account-name" title="当前登录账户">{{ user.username }}</span>

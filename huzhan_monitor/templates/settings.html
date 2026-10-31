@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>设置 · 互站交易监控</title>
+  <link rel="stylesheet" href="/static/style.css?v=0.4.0">
+  <link rel="stylesheet" href="/static/account.css?v=0.4.0">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow"><span class="live-dot"></span> 私有监控</p>
+        <h1>互站交易监控</h1>
+        <p class="subheading">调整自动采集频率，设置保存后持续生效</p>
+      </div>
+    </header>
+    {% set active_page = 'settings' %}
+    {% include '_navigation.html' %}
+    <section aria-labelledby="settings-heading" class="settings-section">
+      <div class="section-heading"><div><p class="eyebrow">COLLECTION SETTINGS</p><h2 id="settings-heading">采集设置</h2></div></div>
+      {% if saved and not error %}<div class="settings-success" role="status">采集间隔已保存，调度器将在 5 秒内重新安排下一次采集。</div>{% endif %}
+      {% if error %}<div class="warning error" role="alert">{{ error }}</div>{% endif %}
+      <div class="settings-layout">
+        <div class="card panel">
+          <form action="/settings" method="post" class="settings-form">
+            <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+            <label for="interval-preset">常用频率</label>
+            <select id="interval-preset">
+              <option value="5"{% if config.interval_minutes == 5 %} selected{% endif %}>每 5 分钟</option>
+              <option value="10"{% if config.interval_minutes == 10 %} selected{% endif %}>每 10 分钟</option>
+              <option value="30"{% if config.interval_minutes == 30 %} selected{% endif %}>每 30 分钟</option>
+              <option value="60"{% if config.interval_minutes == 60 %} selected{% endif %}>每 1 小时</option>
+              <option value="120"{% if config.interval_minutes == 120 %} selected{% endif %}>每 2 小时</option>
+              <option value="360"{% if config.interval_minutes == 360 %} selected{% endif %}>每 6 小时</option>
+              <option value="custom"{% if config.interval_minutes not in [5,10,30,60,120,360] %} selected{% endif %}>自定义</option>
+            </select>
+            <label for="interval-minutes">采集间隔（分钟）</label>
+            <input id="interval-minutes" name="interval_minutes" type="number" min="1" max="1440" step="1" required value="{{ config.interval_minutes }}" aria-describedby="interval-help">
+            <p id="interval-help" class="footnote">输入 1–1440 的整数，60 分钟为 1 小时，1440 分钟为 24 小时。</p>
+            <button type="submit" class="primary">保存设置</button>
+          </form>
+        </div>
+        <aside class="card panel settings-status" aria-label="当前采集配置">
+          <h3>当前配置</h3>
+          <dl>
+            <dt>采集间隔</dt><dd id="current-interval">每 {{ config.interval_minutes }} 分钟</dd>
+            <dt>自动采集</dt><dd>{{ '已启用' if auto_collect else '已通过服务环境变量关闭' }}</dd>
+            <dt>设置更新时间</dt><dd>{{ config.updated_at.replace('T',' ')[:19] if config.updated_at else '默认设置' }}</dd>
+            <dt>最近成功采集</dt><dd>{{ last_success_at.replace('T',' ')[:19] if last_success_at else '尚未成功采集' }}</dd>
+          </dl>
+          <p class="footnote">保存后无需重启。下一次执行以本轮采集开始时间和新间隔重新计算；正在进行的采集不会被中断。服务重启仍保留设置，并立即采集一次。</p>
+          {% if not auto_collect %}<div class="warning">内置采集目前已关闭。这里保存的间隔不会改变外部计划任务；启用内置采集需要调整服务环境变量后重启。</div>{% endif %}
+        </aside>
+      </div>
+      <p class="footnote">首页仅展示有限的最新交易，采集间隔越长，漏掉交易的可能性越高。修改频率无法补回历史缺失数据。</p>
+    </section>
+    <footer>公开交易观察 · 设置 · 北京时间</footer>
+  </div>
+  <script src="/static/settings.js?v=0.4.0" defer></script>
+</body>
+</html>

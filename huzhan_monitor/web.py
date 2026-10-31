@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from . import auth, db, reports, settings
+from . import auth, db, preferences, reports, settings
 
 HERE = Path(__file__).resolve().parent
 app = FastAPI(title="互站交易监控", docs_url=None, redoc_url=None, openapi_url=None)
@@ -31,6 +31,7 @@ SESSION_SECONDS = 12 * 60 * 60
 def init_database() -> None:
     app.state.collector_scheduler = None
     db.initialize()
+    preferences.initialize()
     auth.initialize()
     auth.bootstrap_from_environment()
     if settings.AUTO_COLLECT:
@@ -50,7 +51,7 @@ def stop_collection() -> None:
 @app.middleware("http")
 async def protect_dashboard(request: Request, call_next):
     path = request.url.path
-    public = path in ("/login", "/health") or path.startswith("/static/")
+    public = path in ("/login", "/health", "/favicon.ico") or path.startswith("/static/")
     request.state.user = None
     token = request.cookies.get(SESSION_COOKIE, "")
     if token and not path.startswith("/static/") and path != "/health":
@@ -59,7 +60,7 @@ async def protect_dashboard(request: Request, call_next):
         if path.startswith("/api/"):
             response = JSONResponse({"detail": "请先登录"}, status_code=401)
         else:
-            destination = "/logs" if path == "/logs" else "/"
+            destination = path if path in ("/logs", "/settings") else "/"
             response = RedirectResponse("/login?next=" + destination, status_code=303)
     else:
         response = await call_next(request)
@@ -76,12 +77,14 @@ def cookie_secure(request: Request) -> bool:
 
 
 def allowed_destination(value: str) -> str:
-    return value if value in ("/", "/logs") else "/"
+    return value if value in ("/", "/logs", "/settings") else "/"
 
 
 def login_page(request: Request, *, error: str | None = None, status: int = 200,
                username: str = "", destination: str = "/"):
-    csrf = secrets.token_urlsafe(32)
+    csrf = request.cookies.get(LOGIN_CSRF_COOKIE, "")
+    if not (32 <= len(csrf) <= 128 and csrf.isascii() and all(c.isalnum() or c in "_-" for c in csrf)):
+        csrf = secrets.token_urlsafe(32)
     response = templates.TemplateResponse(
         request=request, name="login.html",
         context={"configured": auth.is_configured(), "error": error, "csrf_token": csrf,
@@ -207,6 +210,38 @@ def run_logs(day: str | None = None, status: str = "all", page: int = Query(1, g
     return reports.run_log_report(day_arg(day), status, page, page_size)
 
 
+@app.get("/settings", response_class=HTMLResponse)
+def settings_get(request: Request):
+    return render_settings(request)
+
+
+def render_settings(request: Request, error: str | None = None, status: int = 200):
+    with db.connect() as conn:
+        last = conn.execute("SELECT finished_at FROM runs WHERE status='success' ORDER BY finished_at DESC LIMIT 1").fetchone()
+    return templates.TemplateResponse(
+        request=request, name="settings.html", status_code=status,
+        context={"user": request.state.user, "config": preferences.get_config(),
+                 "auto_collect": settings.AUTO_COLLECT,
+                 "last_success_at": last["finished_at"] if last else None,
+                 "error": error, "saved": request.query_params.get("saved") == "1"},
+    )
+
+
+@app.post("/settings", response_class=HTMLResponse)
+async def settings_post(request: Request):
+    form = await bounded_form(request)
+    if not valid_csrf(request, form.get("csrf_token", ""), request.state.user["csrf_token"]):
+        raise HTTPException(status_code=403, detail="设置页面已过期，请刷新后重试")
+    raw = form.get("interval_minutes", "").strip()
+    try:
+        if not raw.isascii() or not raw.isdigit() or len(raw) > 4:
+            raise ValueError("采集间隔必须是 1–1440 的整数分钟")
+        await run_in_threadpool(preferences.set_interval, int(raw), request.state.user["username"])
+    except ValueError as exc:
+        return await run_in_threadpool(render_settings, request, error=str(exc), status=400)
+    return RedirectResponse("/settings?saved=1", status_code=303)
+
+
 @app.get("/api/summary")
 def summary(day: str | None = None):
     selected = day_arg(day)
@@ -271,3 +306,8 @@ def export(day: str | None = None, status: str = "all", q: str = Query("", max_l
 @app.get("/health", response_class=PlainTextResponse)
 def health():
     return PlainTextResponse("huzhan-monitor-ok", headers={"X-Huzhan-Auto-Collect": "1" if settings.AUTO_COLLECT else "0"})
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)

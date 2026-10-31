@@ -42,7 +42,7 @@ function renderSummary(data) {
 
 function renderNotices(data) {
   $("#collection-mode").textContent = data.auto_collect
-    ? "采集配置：随网页服务自动运行，每 10 分钟执行一次。"
+    ? "采集配置：随网页服务自动运行，每 " + String(data.interval_minutes ?? 10) + " 分钟执行一次（可在设置中修改）。"
     : "采集配置：内置调度已关闭，使用外部采集任务。";
   const notices = Array.isArray(data.notices) ? data.notices : [];
   $("#notices").innerHTML = notices.map((notice) => {
